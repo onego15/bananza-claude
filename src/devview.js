@@ -1,0 +1,41 @@
+import * as THREE from 'three';
+import { buildHeroModel } from './actors/heroModel.js';
+import { Volume } from './terrain/volume.js';
+import { Terrain } from './terrain/terrain.js';
+import { Noise3 } from './core/noise.js';
+import { area1 } from './world/areas/area1.js';
+
+export function devView(canvas) {
+  const r = new THREE.WebGLRenderer({ canvas, antialias: true });
+  r.setSize(innerWidth, innerHeight);
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  const q = new URLSearchParams(location.search);
+  const A = area1, th = A.theme;
+  scene.background = new THREE.Color(th.bg);
+  scene.fog = new THREE.FogExp2(th.fog, th.fogDensity);
+  const cam = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 300);
+  const cp = (q.get('c') || '32,20,2').split(',').map(Number);
+  const lp = (q.get('l') || '32,15,30').split(',').map(Number);
+  cam.position.set(...cp); cam.lookAt(...lp);
+  scene.add(new THREE.HemisphereLight(th.hemiSky, th.hemiGround, th.hemiInt));
+  const d = new THREE.DirectionalLight(th.keyColor, th.keyInt); d.position.set(...th.keyDir); scene.add(d);
+  const noise = new Noise3(A.seed);
+  const vol = new Volume(Math.round(A.size[0] / A.voxel) + 1, Math.round(A.size[1] / A.voxel) + 1, Math.round(A.size[2] / A.voxel) + 1, A.voxel);
+  let t0 = performance.now();
+  const B = A.build(noise);
+  vol.fill(B.build());
+  console.log('fill ms', performance.now() - t0);
+  t0 = performance.now();
+  const terr = new Terrain(vol, th);
+  terr.buildAll();
+  console.log('mesh ms', performance.now() - t0, 'tris', terr.triCount);
+  scene.add(terr.group);
+  const hero = buildHeroModel();
+  hero.root.position.set(32, 14.2, 7.5);
+  scene.add(hero.root);
+  const pl = new THREE.PointLight(0xffaa55, 30, 12); pl.position.set(32, 15, 30); scene.add(pl);
+  r.render(scene, cam);
+  window.__ready = true;
+}
