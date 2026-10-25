@@ -308,7 +308,7 @@ export class World {
   boulderHits(b) {
     for (const e of this.entities) {
       if (e instanceof Cage && !e.broken && e.alive) {
-        if (Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z) < e.r + b.r * 0.8 && b.pos.y < e.pos.y + e.h + b.r + 0.5) e.smash();
+        if (Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z) < e.r + b.r * 0.8 && b.pos.y < e.pos.y + e.h + b.r + 0.5) { e.smash(); b.shatter(); return; }
       } else if ((e instanceof Grub || e instanceof Golem) && e.alive && e.pos.distanceTo(b.pos) < b.r + 1) e.hit(5, b.vel.clone().normalize(), b, true);
     }
     const p = this.game.player;
@@ -348,7 +348,7 @@ export class World {
     this.fallLock = true;
     this.game.audio.play(kind === 'lava' ? 'hurt' : 'fall');
     this.game.respawnAfterFall(kind);
-    setTimeout(() => (this.fallLock = false), 1200);
+    this.game.after(1.2, () => (this.fallLock = false));
   }
 
   echo(player) {
@@ -422,6 +422,17 @@ export class World {
   dispose() {
     this.scene.remove(this.root);
     this.terrain.dispose();
-    this.root.traverse((o) => { if (o.isInstancedMesh) o.dispose?.(); });
+    // free GPU memory of everything this area created (shared prop geometry is simply
+    // re-uploaded by three.js if a later area uses it again)
+    const mats = new Set();
+    this.root.traverse((o) => {
+      if (o.isInstancedMesh) o.dispose?.();
+      o.geometry?.dispose?.();
+      if (o.material) for (const m of [].concat(o.material)) mats.add(m);
+    });
+    for (const m of mats) {
+      for (const v of Object.values(m)) if (v?.isTexture) v.dispose();
+      m.dispose();
+    }
   }
 }

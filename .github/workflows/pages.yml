@@ -1,0 +1,77 @@
+name: Deploy to GitHub Pages
+
+# Builds the Vite app and publishes dist/ to the gh-pages branch, which GitHub Pages serves at
+# https://<owner>.github.io/<repo>/. A second job then loads the live site in headless Chromium
+# and checks that every asset loads, the title screen renders, a game starts and digging works.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Publish dist/ to gh-pages
+        run: |
+          touch dist/.nojekyll
+          cd dist
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Deploy ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright@1.56.1 install --with-deps chromium
+      - name: Wait for the Pages build of this commit
+        run: |
+          URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+          echo "URL=$URL" >> "$GITHUB_ENV"
+          for i in $(seq 1 60); do
+            code=$(curl -s -o page.html -w '%{http_code}' "$URL?nocache=$i" || true)
+            echo "attempt $i: HTTP $code"
+            if [ "$code" = "200" ] && grep -q 'id="game"' page.html; then
+              asset=$(grep -o 'assets/index-[^"]*\.js' page.html | head -1)
+              acode=$(curl -s -o /dev/null -w '%{http_code}' "$URL$asset")
+              echo "main bundle $asset: HTTP $acode"
+              [ "$acode" = "200" ] && exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Pages site did not come up at $URL (is Pages enabled with source = gh-pages branch?)"
+          exit 1
+      - name: Smoke test the live site
+        run: |
+          npm i --no-save playwright@1.56.1
+          node tests/live-check.cjs "$URL" live-check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-check
+          path: live-check

@@ -134,7 +134,9 @@ export class Player {
       const d = vol.sample(pos.x, pos.y + SPHERES[0] - t, pos.z);
       if (d < RAD + 0.02) {
         vol.gradient(pos.x, pos.y + SPHERES[0] - t, pos.z, g, 0.2);
-        if (g.y > 0.62) return t;
+        // only snap when there really is floor under the feet: hovering on the rim of a hole
+        // (field is near-surface but the gradient points up) must let the hero drop in
+        if (g.y > 0.62 && vol.sample(pos.x, pos.y + SPHERES[0] - t - RAD - 0.15, pos.z) < 0.2) return t;
         return -1;
       }
     }
@@ -148,7 +150,10 @@ export class Player {
     this.stateT += dt;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.dashCD > 0) this.dashCD -= dt;
-    if (this.controlLock > 0) this.controlLock -= dt;
+    if (this.controlLock > 0) {
+      this.controlLock -= dt;
+      if (this.controlLock <= 0 && this.state === 'cutscene') { this.setState('move'); this.pose.victory = false; }
+    }
     this.comboWindow -= dt;
 
     const locked = this.controlLock > 0 || this.state === 'cutscene' || this.dead;

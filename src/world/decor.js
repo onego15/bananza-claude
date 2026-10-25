@@ -150,25 +150,44 @@ function pebbleGeometry() {
 }
 
 function crystalClusterGeometry() {
+  // hexagonal prisms with pointed tips; vertex colour runs dark at the root -> bright at the tip
   const geos = [];
   const rnd = mulberry32(23);
   for (let i = 0; i < 5; i++) {
-    const h = 0.5 + rnd() * 1.1;
-    const c = new THREE.CylinderGeometry(0, 0.12 + rnd() * 0.08, h * 0.25, 6, 1);
-    c.translate(0, h + h * 0.125 - 0.02, 0);
-    const b = new THREE.CylinderGeometry(0.12 + rnd() * 0.08, 0.13 + rnd() * 0.08, h, 6, 1);
+    const h = (i === 0 ? 0.75 : 0.3 + rnd() * 0.45);
+    const r = (i === 0 ? 0.13 : 0.06 + rnd() * 0.05);
+    const c = new THREE.CylinderGeometry(0, r, r * 2.2, 6, 1);
+    c.translate(0, h + r * 1.1 - 0.01, 0);
+    const b = new THREE.CylinderGeometry(r, r * 1.08, h, 6, 1);
     b.translate(0, h / 2, 0);
-    const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler((rnd() - 0.5) * 0.9, rnd() * 6, (rnd() - 0.5) * 0.9));
-    m.setPosition((rnd() - 0.5) * 0.4, 0, (rnd() - 0.5) * 0.4);
-    c.applyMatrix4(m); b.applyMatrix4(m);
-    geos.push(b.toNonIndexed(), c.toNonIndexed());
+    const tilt = i === 0 ? 0.12 : 0.35 + rnd() * 0.5;
+    const ang = rnd() * 6.28;
+    const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.cos(ang) * tilt, rnd() * 6, Math.sin(ang) * tilt));
+    m.setPosition(i === 0 ? 0 : Math.sin(ang) * 0.14, -0.05, i === 0 ? 0 : -Math.cos(ang) * 0.14);
+    for (const g of [b, c]) {
+      g.applyMatrix4(m);
+      const ng = g.toNonIndexed();
+      ng.userData.h = h + r * 2.2;
+      geos.push(ng);
+    }
   }
   let total = 0; for (const g of geos) total += g.attributes.position.count;
   const pos = new Float32Array(total * 3);
+  const col = new Float32Array(total * 3);
   let o = 0;
-  for (const g of geos) { pos.set(g.attributes.position.array, o); o += g.attributes.position.array.length; }
+  for (const g of geos) {
+    const a = g.attributes.position.array;
+    pos.set(a, o);
+    for (let k = 0; k < a.length; k += 3) {
+      const t = Math.min(1, Math.max(0, a[k + 1] / 0.9));
+      const v = 0.08 + Math.pow(t, 1.6) * 0.92;
+      col[o + k] = v; col[o + k + 1] = v; col[o + k + 2] = v;
+    }
+    o += a.length;
+  }
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   out.computeVertexNormals();
   return out;
 }
@@ -332,7 +351,13 @@ export class Decor {
   }
 
   setupCrystal() {
-    const crystMat = new THREE.MeshStandardMaterial({ color: 0x2a3a66, emissive: this.world.theme.crystal, emissiveIntensity: 0.9, roughness: 0.1, metalness: 0.1, flatShading: true });
+    const crystCol = new THREE.Color(this.world.theme.crystal);
+    const crystMat = new THREE.MeshStandardMaterial({ color: crystCol.clone().multiplyScalar(0.35), vertexColors: true, emissive: crystCol, emissiveIntensity: 0.55, roughness: 0.15, metalness: 0.2, flatShading: true });
+    crystMat.onBeforeCompile = (sh) => {
+      // emission only near the tips (vertex colour encodes height), body stays a dark glassy facet
+      sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= vColor.r * vColor.r;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb = diffuse * (0.45 + 0.55 * vColor.r);');
+    };
     const cryst = this.addType('cryst', crystalClusterGeometry(), crystMat, 900, { burst: { color: new THREE.Color(this.world.theme.crystal), speed: 6, size: 0.2, size1: 0.05, life: 0.9, additive: true, gravity: 4 } });
     const mushMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 });
     mushMat.onBeforeCompile = (sh) => {
@@ -351,17 +376,17 @@ export class Decor {
       floor: (p, n, mat, rnd, D) => {
         if (n.y < 0.6) return;
         const k = this.world.noise.noise(p.x * 0.1, p.y * 0.1, p.z * 0.1);
-        if ((mat === MAT.CRYSTAL || (mat === MAT.ROCK && k > 0.35)) && rnd() < 0.25) D.add(cryst, p, n, 0.6 + rnd() * 1.4, rnd() * 6, 0.6);
+        if ((mat === MAT.CRYSTAL || (mat === MAT.ROCK && k > 0.35)) && rnd() < 0.14) D.add(cryst, p, n, 0.6 + rnd() * 0.9, rnd() * 6, 0.6);
         if (k < -0.3 && rnd() < 0.05) D.add(mush, p, n, 0.8 + rnd() * 1.2, rnd() * 6, 0.7);
         if (mat === MAT.DIRT && k > -0.1 && rnd() < 0.5) D.add(lichen, p, n, 0.5 + rnd() * 0.5, rnd() * 6, 0.6);
         if (rnd() < 0.05) D.add(peb, p, n, 0.6 + rnd() * 1.4, rnd() * 6, 1);
       },
       ceil: (p, n, mat, rnd, D) => {
         if (n.y > -0.5) return;
-        if ((mat === MAT.CRYSTAL || mat === MAT.ROCK) && rnd() < 0.06) D.add(cryst, p, n, 0.7 + rnd() * 1.6, rnd() * 6, 1);
+        if ((mat === MAT.CRYSTAL || mat === MAT.ROCK) && rnd() < 0.06) D.add(cryst, p, n, 0.7 + rnd() * 1.0, rnd() * 6, 1);
       },
       wall: (p, n, mat, rnd, D) => {
-        if (mat === MAT.CRYSTAL && rnd() < 0.3) D.add(cryst, p, n, 0.5 + rnd() * 1.0, rnd() * 6, 1);
+        if (mat === MAT.CRYSTAL && rnd() < 0.18) D.add(cryst, p, n, 0.5 + rnd() * 0.7, rnd() * 6, 1);
       },
     }, 21);
   }

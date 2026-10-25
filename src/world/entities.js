@@ -496,30 +496,64 @@ export class Boulder extends Entity {
     if (this.state === 'done' && def.endPos) { this.pos.fromArray(def.endPos); this.group.position.copy(this.pos); }
     this.updateCollider();
     this.hitSphere = { c: this.pos, r: def.r };
+    if (this.state === 'done' && def.cageTarget && world.game.save.flag(def.cageTarget + '_cage')) { this.group.visible = false; this.collider = null; this.hitSphere = null; }
   }
   updateCollider() {
     const r = this.r * 0.9;
     this.collider = { sphere: true, c: this.pos, r };
   }
-  hit() { this.game.audio.play('impact_rock'); this.world.fx.puff(this.pos, 6, { color: new THREE.Color(0.5, 0.48, 0.5), speed: 2, size: 0.6, size1: 1.5, life: 0.7, alpha: 0.4 }); this.checkSupport(true); return true; }
+  hit(dmg, dir) {
+    this.game.audio.play('impact_rock');
+    this.world.fx.puff(this.pos, 6, { color: new THREE.Color(0.5, 0.48, 0.5), speed: 2, size: 0.6, size1: 1.5, life: 0.7, alpha: 0.4 });
+    if (this.state === 'rest') {
+      this.pushes = (this.pushes || 0) + 1;
+      // a few punches shove it off the shelf even if the player never digs underneath
+      if (this.pushes >= 3) {
+        // the shoved boulder's weight cracks the dirt shelf beneath it
+        this.world.dig(new THREE.Vector3(this.pos.x, this.pos.y - this.r - 0.6, this.pos.z), 2.4, { power: 2, gauntlet: true });
+        this.checkSupport();
+        if (this.state === 'rest' && dir) { this.vel.set(dir.x, 0, dir.z).normalize().multiplyScalar(4); this.startFall(); }
+      }
+      else { this.mesh.rotation.z += 0.05; this.checkSupport(); }
+    }
+    return true;
+  }
   onDig() { this.checkSupport(); }
-  checkSupport(nudge) {
+  checkSupport() {
     if (this.state !== 'rest') return;
     const vol = this.world.vol;
     // supported if solid ground directly under the bottom
     let sup = 0;
     for (const [dx, dz] of [[0, 0], [0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) if (vol.sample(this.pos.x + dx * this.r, this.pos.y - this.r - 0.3, this.pos.z + dz * this.r) < 0.2) sup++;
-    if (sup <= 1) {
-      this.state = 'fall';
-      this.game.audio.play('golem');
-      this.game.hud.toast('大岩が転がり落ちる！', 'info');
-      this.game.cutsceneFollow?.(this, 2.8);
-    }
+    if (sup <= 2) this.startFall();
+  }
+  // the boulder bursts on the cage so it never ends up blocking the beacon it freed
+  shatter() {
+    if (this.state === 'done') return;
+    this.state = 'done';
+    this.game.save.setFlag(this.def.id);
+    this.world.fx.spawnDebris(this.pos.clone(), new THREE.Vector3(0, 3, 0), 40, new THREE.Color(0.42, 0.4, 0.46), 9, 1.6);
+    this.world.fx.puff(this.pos, 30, { color: new THREE.Color(0.55, 0.52, 0.58), speed: 6, size: 1, size1: 3, life: 1.3, alpha: 0.5 });
+    this.game.cameraRig.shake(0.7);
+    this.remove();
+  }
+  startFall() {
+    if (this.state !== 'rest') return;
+    this.state = 'fall';
+    this.game.audio.play('golem');
+    this.game.hud.toast('大岩が転がり落ちる！', 'info');
+    this.game.cutsceneFollow?.(this, 2.8);
   }
   update(dt) {
     if (this.state !== 'fall') return;
     const vol = this.world.vol;
     this.vel.y -= 25 * dt;
+    const ep = this.def.endPos;
+    if (ep && !this.world.game.save.flag(this.def.cageTarget + '_cage')) {
+      // the shelf sits right above the cage: bias the roll so the puzzle reads reliably
+      const dx = ep[0] - this.pos.x, dz = ep[2] - this.pos.z;
+      if (this.pos.y < this.def.pos[1] - 1 && Math.hypot(dx, dz) < 7) { this.vel.x += dx * 6 * dt; this.vel.z += dz * 6 * dt; }
+    }
     const next = tmp.copy(this.pos).addScaledVector(this.vel, dt);
     const d = vol.sample(next.x, next.y, next.z);
     if (d < this.r) {
@@ -546,7 +580,12 @@ export class Boulder extends Entity {
     this.world.boulderHits(this);
     if (this.vel.lengthSq() < 0.3 && d < this.r + 0.2) {
       this.restT = (this.restT || 0) + dt;
-      if (this.restT > 1) { this.state = 'done'; this.game.save.setFlag(this.def.id); }
+      if (this.restT > 1) {
+        this.state = 'done'; this.game.save.setFlag(this.def.id);
+        // never soft-lock: a boulder that came down near the cage still breaks it
+        const cage = this.world.entities.find((e) => e instanceof Cage && !e.broken);
+        if (cage && Math.hypot(cage.pos.x - this.pos.x, cage.pos.z - this.pos.z) < 6) { cage.smash(); this.state = 'rest'; this.shatter(); }
+      }
     }
     if (this.pos.y < -5) { this.state = 'done'; this.remove(); }
   }

@@ -1,0 +1,6 @@
+const { TP, st, pound } = require('./common.cjs');
+module.exports = {
+  url: 'http://localhost:5173/?autotest&capture&area=2&relics=gauntlet,quake',
+  steps: [ st(5), { eval: `(() => { const w = window.__game.world; const s = w.entities.find((e) => e.def.type === 'seal'); s.shatter(); })()` }, TP(36, 10, 65, Math.PI, -0.5), st(30),
+    { eval: `(() => { const g = window.__game, w = g.world, p = g.player; const out = []; for (const e of w.entities) { const c = e.collider; if (!c) continue; if (c.sphere ? c.c.distanceTo(p.pos) < 5 : (p.pos.x > c.min.x - 2 && p.pos.x < c.max.x + 2 && p.pos.z > c.min.z - 2 && p.pos.z < c.max.z + 2)) out.push([e.def.type, c.min && c.min.toArray(), c.max && c.max.toArray()]); } const sph = [0.42, 0.95, 1.42].map((h) => { const gg = {x:0,y:0,z:0}; w.vol.gradient(p.pos.x, p.pos.y + h, p.pos.z, gg, 0.2); return [h, +w.vol.sample(p.pos.x, p.pos.y + h, p.pos.z).toFixed(3), +gg.x.toFixed(2), +gg.y.toFixed(2), +gg.z.toFixed(2)]; }); return { pos: p.pos.toArray(), vel: p.vel.toArray(), st: p.state, sph, out, gb: w.propGroundBelow ? w.propGroundBelow(p.pos) : null, samp: [0.2,0.5,0.8,1.2].map((d) => +w.vol.sample(p.pos.x, p.pos.y - d, p.pos.z).toFixed(2)) }; })()` } ],
+};

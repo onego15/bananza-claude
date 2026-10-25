@@ -184,6 +184,7 @@ export class Game {
   async loadArea(id, opts = {}) {
     const def = AREAS[id];
     this.state = 'loading';
+    this.timers = [];
     if (!opts.silent) this.hud.showLoading(`AREA ${id}  ${def.name}`, def.tip || '');
     else if (!this.world) this.hud.showLoading('GORO DIG', '地底世界を生成しています…');
     if (this.world) { this.world.dispose(); this.world = null; }
@@ -306,7 +307,7 @@ export class Game {
   respawnAfterFall(kind) {
     const p = this.player;
     this.hud.fade(true);
-    setTimeout(() => {
+    this.after(0.45, () => {
       p.hp -= 1;
       this.hud.flashDamage();
       if (p.hp <= 0) { this.hud.fade(false); this.onPlayerDeath(); return; }
@@ -316,7 +317,7 @@ export class Game {
       p.unstick();
       this.hud.fade(false);
       if (kind === 'lava') this.hud.toast('あちちっ！ 溶岩に気をつけて', 'warn');
-    }, 450);
+    });
   }
 
   onPlayerDeath() {
@@ -326,7 +327,7 @@ export class Game {
     this.save.data.deaths++;
     this.writeSave();
     document.exitPointerLock?.();
-    setTimeout(() => {
+    this.after(0.9, () => {
       this.hud.showDeath(() => {
         this.hud.clearScreen();
         this.respawnAtCheckpoint();
@@ -334,7 +335,16 @@ export class Game {
         this.state = 'play';
         this.input.requestLock();
       });
-    }, 900);
+    });
+  }
+
+  // game-time timers: pause with the game and advance deterministically in capture mode
+  after(sec, fn) { (this.timers ||= []).push({ t: sec, fn }); }
+  tickTimers(dt) {
+    if (!this.timers?.length) return;
+    const due = [];
+    this.timers = this.timers.filter((tm) => ((tm.t -= dt) <= 0 ? (due.push(tm.fn), false) : true));
+    for (const fn of due) fn();
   }
 
   hitstop(t) { this.hitstopT = Math.max(this.hitstopT, t); }
@@ -369,12 +379,12 @@ export class Game {
     this.player.setState('cutscene');
     this.player.pose.victory = true;
     this.player.controlLock = 2.4;
-    setTimeout(() => { if (this.player.state === 'cutscene') { this.player.setState('move'); this.player.pose.victory = false; } }, 2400);
+
     const info = id === 'gauntlet'
       ? ['大地の籠手を手に入れた！', '黒く輝く「硬岩」もパンチで砕けるようになった。']
       : ['震脚の像を手に入れた！', '空中から右クリックの急降下パンチが巨大な衝撃波に！ 大きく掘れ、敵もまとめて吹き飛ぶ。'];
     this.hud.toast(info[0], 'sun', 4200);
-    setTimeout(() => this.hud.toast(info[1], 'rune', 5200), 900);
+    this.after(0.9, () => this.hud.toast(info[1], 'rune', 5200));
   }
 
   onSunstone() {
@@ -397,14 +407,14 @@ export class Game {
     this.writeSave();
     this.audio.stopSong();
     this.cutsceneLook(boss.pos.clone().setY(boss.pos.y + 4), 3.5);
-    setTimeout(() => {
+    this.after(3.6, () => {
       const core = this.world.entities.find((e) => e.isSunCore);
       if (core) core.ignite();
       this.audio.play('relic');
       this.audio.playSong('ending');
       if (core) this.cutsceneLook(core.pos.clone(), 6);
-    }, 3600);
-    setTimeout(() => this.showEnding(), 10500);
+    });
+    this.after(10.5, () => this.showEnding());
   }
 
   showEnding() {
@@ -490,6 +500,7 @@ export class Game {
     const world = this.world;
 
     if (world && (st === 'play' || st === 'dead' || st === 'transition' || st === 'ending')) {
+      this.tickTimers(dt);
       if (st === 'play' || st === 'dead') this.player.update(gdt, st === 'play' ? input : this.nullInput(), this.cameraRig);
       world.update(gdt, this.camera);
       if (this.cameraRig.override) this.updateCutscene(dt);

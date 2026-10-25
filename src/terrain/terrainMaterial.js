@@ -156,23 +156,32 @@ export function createTerrainMaterial(theme) {
           alb += c * vWa.z; rough += 0.45 * vWa.z; hgt += (facet * 0.8) * vWa.z; metal += 0.25 * vWa.z;
           emi += uRune * vein * 0.12 * vWa.z;
         }
-        // CRYSTAL ORE
+        // CRYSTAL ORE: clustered angular shards in dark host rock (stretched cells -> blade-like facets)
         if (vWa.w > 0.01) {
-          vec2 cc = cell3(P * 1.7);
-          float gem = smoothstep(0.45, 0.15, cc.x);
-          vec3 base = mix(uRockA * 0.6, uRockB * 0.5, n2);
-          vec3 c = mix(base, uCrystal * 0.9, gem);
-          float pulse = 0.75 + 0.25 * sin(uTime * 1.7 + h13(floor(P * 1.7)) * 6.28);
-          alb += c * vWa.w; rough += mix(0.85, 0.15, gem) * vWa.w; hgt += (gem * 0.9) * vWa.w;
-          emi += uCrystal * gem * 1.6 * pulse * vWa.w;
+          float cluster = smoothstep(0.42, 0.62, vn(P * 0.55 + 3.0));
+          vec3 Q = P * vec3(1.6, 0.7, 1.6) + vec3(vn(P * 0.8) * 1.5);
+          vec2 cc = cell3(Q);
+          float edge = cc.y - cc.x;
+          float id = h13(floor(Q * 0.999 + 0.5));
+          float gem = cluster * smoothstep(0.05, 0.22, edge) * step(0.35, id);
+          vec3 host = mix(uRockA * 0.42, uRockB * 0.38, n2);
+          vec3 gc = mix(uCrystal * 0.35, uCrystal * 0.85, smoothstep(0.1, 0.5, edge));
+          vec3 c = mix(host, gc, gem);
+          float pulse = 0.8 + 0.2 * sin(uTime * 1.3 + id * 6.28);
+          alb += c * vWa.w; rough += mix(0.85, 0.12, gem) * vWa.w; hgt += (gem * 0.6 + edge * 0.3) * vWa.w; metal += gem * 0.2 * vWa.w;
+          emi += uCrystal * gem * smoothstep(0.15, 0.45, edge) * 0.55 * pulse * vWa.w;
         }
-        // GOLD ORE
+        // GOLD ORE: thin branching veins plus scattered flakes, not polka dots
         if (vWb.x > 0.01) {
-          vec2 cc = cell3(P * 2.2);
-          float nug = smoothstep(0.38, 0.18, cc.x);
-          vec3 c = mix(uRockA * 0.75 * (0.8 + 0.4 * n2), uGold, nug);
-          alb += c * vWb.x; rough += mix(0.85, 0.25, nug) * vWb.x; hgt += nug * 0.8 * vWb.x; metal += nug * 0.9 * vWb.x;
-          emi += uGold * nug * 0.15 * vWb.x;
+          float v1 = abs(fbm3(P * 0.9) - 0.5);
+          float v2 = abs(vn(P * 2.3 + 11.0) - 0.5);
+          float vein = smoothstep(0.045, 0.0, v1) + smoothstep(0.03, 0.0, v2) * smoothstep(0.12, 0.0, v1) * 0.8;
+          vec2 cc = cell3(P * 4.5);
+          float flake = smoothstep(0.16, 0.05, cc.x) * step(0.6, h13(floor(P * 4.5)));
+          float nug = clamp(vein + flake, 0.0, 1.0);
+          vec3 c = mix(uRockA * 0.6 * (0.8 + 0.4 * n2), uGold * 0.9, nug);
+          alb += c * vWb.x; rough += mix(0.85, 0.22, nug) * vWb.x; hgt += nug * 0.6 * vWb.x; metal += nug * 0.95 * vWb.x;
+          emi += uGold * nug * 0.08 * vWb.x;
         }
         // BRICK (3D masonry lattice)
         if (vWb.y > 0.01) {

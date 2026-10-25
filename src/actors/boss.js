@@ -17,12 +17,15 @@ const tmp2 = new THREE.Vector3();
 
 function bossModel() {
   const mat = createToonishMaterial({ key: 'boss', rim: 0xffb070, rimStrength: 0.5 });
+  // basalt body, lighter weathered top faces with moss, and a few broad molten seams
   const stone = (p, n) => {
-    const crack = Math.abs(nz.noise(p.x * 1.5, p.y * 1.5, p.z * 1.5)) < 0.05;
-    const moss = n && n.y > 0.5 && nz.noise(p.x * 2, p.y * 2, p.z * 2) > 0.1;
-    if (crack) return C(0xff7a2a);
-    if (moss) return C(0x5f7f3a).multiplyScalar(0.8 + 0.3 * (nz.noise(p.x * 9, p.y * 9, p.z * 9) * 0.5 + 0.5));
-    return C(0x7d6a5c).multiplyScalar(0.7 + 0.4 * (nz.noise(p.x * 3, p.y * 3, p.z * 3) * 0.5 + 0.5));
+    const base = C(0x5a4a40).lerp(C(0x8a7462), 0.5 + 0.5 * nz.noise(p.x * 0.9, p.y * 0.9, p.z * 0.9));
+    const up = n ? clamp(n.y, 0, 1) : 0;
+    base.lerp(C(0xa08a70), up * 0.35);
+    const mossK = clamp((up - 0.55) * 3, 0, 1) * clamp(nz.noise(p.x * 1.2 + 5, p.y * 1.2, p.z * 1.2) * 2 + 0.6, 0, 1);
+    base.lerp(C(0x587a34), mossK * 0.85);
+    const seam = 1 - clamp(Math.abs(nz.noise(p.x * 0.55 + 9, p.y * 0.55, p.z * 0.55)) / 0.07, 0, 1);
+    return base.lerp(C(0xff8a3a), seam * seam * (1 - mossK));
   };
   const torso = part([
     S.ellipsoid(V(0, 1.6, 0), V(1.7, 1.5, 1.25)),
@@ -175,7 +178,7 @@ export class Boss extends Entity {
       this.coreHP--;
       this.flash = 1;
       audio.play('core_hit');
-      this.world.fx.puff(this.coreSphere.c, 40, { color: new THREE.Color(1, 0.7, 0.3), speed: 8, size: 0.35, size1: 0.02, life: 1, additive: true });
+      this.world.fx.puff(this.coreSphere.c, 22, { color: new THREE.Color(1, 0.6, 0.25), speed: 9, size: 0.22, size1: 0.02, life: 0.8, additive: true });
       this.world.fx.flash(this.coreSphere.c, 2, 0.15, 0xffc080);
       this.game.hitstop(0.12);
       this.game.cameraRig.shake(0.5);

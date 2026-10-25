@@ -3,5 +3,6 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
-  server: { host: true },
+  // NO_HMR=1 keeps long scripted browser tests from being reloaded when sources change
+  server: { host: true, hmr: process.env.NO_HMR ? false : undefined },
 });

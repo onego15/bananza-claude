@@ -24,12 +24,12 @@ export const area2 = {
   tip: '黒い「硬岩」は大地の籠手で砕ける。大空洞では高い場所から全体を見渡そう。',
   theme: {
     dirtA: 0x3f3549, dirtB: 0x625470, rockA: 0x56546e, rockB: 0x7d7a96, hard: 0x262c3e,
-    crystal: 0x63e6ff, brick: 0x8a86a0, ancient: 0x262336, rune: 0x8fe8ff, bedrock: 0x15121c,
+    crystal: 0x5fd0f0, brick: 0x8a86a0, ancient: 0x262336, rune: 0x8fe8ff, bedrock: 0x15121c,
     moss: 0x3fb0a8, mossAmt: 0.35,
-    fog: 0x111a30, fogDensity: 0.014, bg: 0x0a0f1e,
-    hemiSky: 0x9cb8ff, hemiGround: 0x2c2040, hemiInt: 1.0,
+    fog: 0x161a2a, fogDensity: 0.014, bg: 0x0a0f1e,
+    hemiSky: 0xaab6d8, hemiGround: 0x2c2040, hemiInt: 1.0,
     keyColor: 0xb8d4ff, keyInt: 1.7, keyDir: [-0.3, 1, 0.35],
-    bloom: 0.85, grade: 0xf0f6ff,
+    bloom: 0.6, grade: 0xf0f6ff,
     playerLight: 0xd0e4ff,
     music: 'crystal',
   },
@@ -76,7 +76,7 @@ export const area2 = {
     B.tunnel([[16, 10.5, 43.5], [8.5, 10.5, 44]], 1.9, { flat: 0.5 });
     B.sphereSolid(12.2, 10.5, 43.7, 2.5, MAT.HARD);
     // boulder shelf above the cage
-    B.boxSolid(53, 13.5, 24, 4.6, 1.2, 2.6, MAT.DIRT, 0.4);
+    B.boxSolid(53, 13.9, 24, 4.6, 0.7, 2.6, MAT.DIRT, 0.35);
     // gold pocket with a sunstone west of the ledge
     B.veinSphere(30, 31, 17, 2.4, MAT.GOLD);
     // crypt: ancient shell, doorway, slam seal shaft
@@ -84,7 +84,7 @@ export const area2 = {
     B.boxSolid(36, 13, 67, 8, 6, 6, MAT.ANCIENT, 0.3, { after: true });
     B.cutBox(36, 13.5, 67, 5.5, 4, 4, 0.5);
     B.cutBox(36, 12, 61, 2.2, 2.6, 2.2, 0.3);
-    B.cut([33, 2, 63, 39, 10, 69], (x, y, z) => Math.max(Math.hypot(x - 36, z - 66) - 1.4, 2.5 - y, y - 9.7));
+    B.cut([33, 2, 63, 39, 11.5, 69], (x, y, z) => Math.max(Math.hypot(x - 36, z - 66) - 1.9, 2.5 - y, y - 11.0));
     return B;
   },
 
@@ -108,11 +108,11 @@ export const area2 = {
     { type: 'beacon', id: 'a2_b2', pos: [6.5, 9.5, 44.5], group: 'a2_beacon' },
     { type: 'beacon', id: 'a2_b3', pos: [51, 8, 24], group: 'a2_beacon', caged: true },
     { type: 'cage', id: 'a2_cage', target: 'a2_b3', pos: [51, 8, 24], r: 1.6, h: 3.6 },
-    { type: 'boulder', id: 'a2_boulder', pos: [51, 16.4, 24], r: 1.6, endPos: [51, 9.2, 24] },
+    { type: 'boulder', id: 'a2_boulder', pos: [51, 16.2, 24], r: 1.6, endPos: [51, 9.2, 24], cageTarget: 'a2_b3' },
     { type: 'gate', id: 'a2_gate', pos: [36, 9.4, 61], w: 4.4, h: 5.2, group: 'a2_beacon', need: 3 },
     { type: 'relic', id: 'quake', pos: [36, 9.6, 70] },
-    { type: 'seal', id: 'a2_seal', pos: [36, 9.6, 66], r: 1.7 },
-    { type: 'exitShaft', pos: [36, 66], y: 5.5, r: 1.5, to: 3 },
+    { type: 'seal', id: 'a2_seal', pos: [36, 9.6, 66], r: 2.2 },
+    { type: 'exitShaft', pos: [36, 66], y: 5.5, r: 1.9, to: 3 },
     { type: 'liquid', kind: 'water', pos: [34, 7.2, 44], size: [26, 18] },
     { type: 'shimmer', pos: [33.8, 32.1, 18.5] },
 
