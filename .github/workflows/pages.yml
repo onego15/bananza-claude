@@ -74,6 +74,10 @@ jobs:
         run: |
           npm i --no-save playwright@1.56.1
           node tests/live-check.cjs "$URL" live-check
+      - name: Publish the smoke-test result as an annotation
+        if: always()
+        run: |
+          [ -f live-check/result.json ] && echo "::notice title=live-check::$(node -e 'const r=require("./live-check/result.json");console.log(JSON.stringify({ok:r.ok,base:r.base,checks:r.checks,failedRequests:r.failedRequests.length,pageErrors:r.pageErrors.length}))')" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
