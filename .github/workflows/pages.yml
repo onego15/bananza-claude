@@ -48,15 +48,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run build
       - run: npx playwright@1.56.1 install --with-deps chromium
       - name: Wait for the Pages build of this commit
         run: |
           URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
           echo "URL=$URL" >> "$GITHUB_ENV"
+          # the live page must serve the bundle of *this* commit, not a previous deploy
+          WANT=$(grep -o 'assets/index-[^"]*\.js' dist/index.html | head -1)
+          echo "expecting $WANT"
           for i in $(seq 1 60); do
             code=$(curl -s -o page.html -w '%{http_code}' "$URL?nocache=$i" || true)
             echo "attempt $i: HTTP $code"
-            if [ "$code" = "200" ] && grep -q 'id="game"' page.html; then
+            if [ "$code" = "200" ] && grep -q "$WANT" page.html; then
               asset=$(grep -o 'assets/index-[^"]*\.js' page.html | head -1)
               acode=$(curl -s -o /dev/null -w '%{http_code}' "$URL$asset")
               echo "main bundle $asset: HTTP $acode"
