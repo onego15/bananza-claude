@@ -47,7 +47,7 @@ for (const id of [1, 2, 3]) {
       const lo = (v) => Math.max(0, Math.floor((v - 1) / C)), hi = (v, n) => Math.min(n - 1, Math.floor((v + 1) / C));
       for (let a = lo(bb[0]); a <= hi(bb[3], cx); a++)
         for (let b = lo(bb[1]); b <= hi(bb[4], cy); b++)
-          for (let c = lo(bb[2]); c <= hi(bb[5], cz); c++) meshChunk(vol, a, b, c, C);
+          for (let c = lo(bb[2]); c <= hi(bb[5], cz); c++) meshChunk(vol, a, b, c, C, true); // same fast path the game uses on impact
       digs++;
       const mat = vol.materialAt(x, y, z);
       if (vol.sample(x, y, z) > 0 || mat === MAT.ANCIENT || mat === MAT.BEDROCK) carvedOk++;

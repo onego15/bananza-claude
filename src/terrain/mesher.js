@@ -41,7 +41,7 @@ function getScratch(C) {
 
 const g = { x: 0, y: 0, z: 0 };
 
-export function meshChunk(vol, cx, cy, cz, C) {
+export function meshChunk(vol, cx, cy, cz, C, fast = false) {
   const S = getScratch(C);
   const { N, vidx, pos, nrm, wa, wb, ao, idx } = S;
   const { nx, ny, nz, f, m, s, sxy } = vol;
@@ -111,8 +111,10 @@ export function meshChunk(vol, cx, cy, cz, C) {
           const v = vol.sample(wx + g.x * d, wy + g.y * d, wz + g.z * d);
           occ += Math.max(0, d - v) / d * (1 / k);
         }
-        let open = 0;
-        for (let q = 0; q < AO_DIRS.length; q++) {
+        // fast mode (right after a dig): skip the wide cone probes; the deferred rebuild
+        // a few frames later restores full-quality AO
+        let open = fast ? AO_DIRS.length * 0.75 : 0;
+        for (let q = 0; !fast && q < AO_DIRS.length; q++) {
           const D = AO_DIRS[q];
           const dx = D[0] + g.x, dy = D[1] + g.y, dz = D[2] + g.z;
           const l = Math.hypot(dx, dy, dz) || 1;

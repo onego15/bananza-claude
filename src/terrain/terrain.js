@@ -46,9 +46,9 @@ export class Terrain {
     }
   }
 
-  rebuild(i, j, k) {
+  rebuild(i, j, k, fast = false) {
     const key = this.key(i, j, k);
-    const data = meshChunk(this.vol, i, j, k, CHUNK);
+    const data = meshChunk(this.vol, i, j, k, CHUNK, fast);
     let mesh = this.meshes[key];
     if (!data) {
       if (mesh) {
@@ -89,7 +89,7 @@ export class Terrain {
     const cj0 = Math.max(0, Math.floor((j0 - 1) / CHUNK)), cj1 = Math.min(this.cy - 1, Math.floor((j1 + 1) / CHUNK));
     const ck0 = Math.max(0, Math.floor((k0 - 1) / CHUNK)), ck1 = Math.min(this.cz - 1, Math.floor((k1 + 1) / CHUNK));
     for (let k = ck0; k <= ck1; k++) for (let j = cj0; j <= cj1; j++) for (let i = ci0; i <= ci1; i++) {
-      if (immediate) this.rebuild(i, j, k);
+      if (immediate) this.rebuild(i, j, k, true);
       else this.dirty.add(this.key(i, j, k));
     }
   }
